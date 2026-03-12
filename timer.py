@@ -57,23 +57,21 @@ class BJJTimerTouch:
         self.update_clock()
 
     def create_ui(self):
-        # ===== FRAME TOP cu TITLU NOVA SQUAD =====
-        header_frame = tk.Frame(self.root, bg='#1a1a1a', padx=15, pady=10)
-        header_frame.pack(fill=tk.X)
+        # ===== FRAME SUPERIOR - PRESETARI CU TITLU =====
+        top_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=15)
+        top_frame.pack(fill=tk.X, pady=10)
         
-        # Spacer pe stânga
-        tk.Label(header_frame, text="", bg='#1a1a1a').pack(side=tk.LEFT, expand=True)
+        # Label "SELECTEAZA PRESET" pe stânga
+        tk.Label(top_frame, text="SELECTEAZA PRESET:", font=("Arial", 14, "bold"), fg="#FFD700", bg='#2a2a2a').pack(side=tk.LEFT, anchor=tk.W)
+        
+        # Spacer în centru
+        tk.Label(top_frame, text="", bg='#2a2a2a').pack(side=tk.LEFT, expand=True)
         
         # Titlu NOVA SQUAD pe dreapta
-        tk.Label(header_frame, text="NOVA SQUAD", font=("Arial", 32, "bold"), fg="#FF6B00", bg='#1a1a1a').pack(side=tk.RIGHT, padx=30)
+        tk.Label(top_frame, text="NOVA SQUAD", font=("Arial", 20, "bold"), fg="#FF6B00", bg='#2a2a2a').pack(side=tk.RIGHT, padx=20)
         
-        # ===== FRAME SUPERIOR - PRESETARI =====
-        top_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=15)
-        top_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        tk.Label(top_frame, text="SELECTEAZA PRESET:", font=("Arial", 14, "bold"), fg="#FFD700", bg='#2a2a2a').pack(anchor=tk.W, pady=(0, 10))
-        
-        preset_buttons_frame = tk.Frame(top_frame, bg='#2a2a2a')
+        # ===== FRAME BUTOANE PRESETARI =====
+        preset_buttons_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=10)
         preset_buttons_frame.pack(fill=tk.X)
         
         self.preset_var = tk.StringVar(value="Training")
