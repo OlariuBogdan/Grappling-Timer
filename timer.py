@@ -19,6 +19,7 @@ class BJJTimerTouch:
         self.root = root
         self.root.title("BJJ Grappling Timer Pro - Nova Squad")
         self.root.geometry("1920x1080")
+        self.root.attributes('-fullscreen', True)
 
         # Initialize managers
         self.config = ConfigManager()
