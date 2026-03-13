@@ -1,0 +1,12 @@
+{
+    "last_preset": "Training",
+    "work_time": 300,
+    "rest_time": 60,
+    "total_rounds": 5,
+    "prep_time": 12,
+    "volume": 50,
+    "fullscreen": true,
+    "music_folder": "",
+    "window_width": 1920,
+    "window_height": 1080
+}

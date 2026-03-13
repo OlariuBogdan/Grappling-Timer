@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox
 import os
 import pygame
@@ -25,11 +26,34 @@ class BJJTimerTouch:
         self.stats = TrainingStats()
         self.sound_manager = SoundManager(os.path.dirname(__file__))
 
-        # Initialize training variables
+        # Load configuration
+        self.load_config_settings()
+
+        # Initialize training variables with defaults
+        self.initialize_training_variables()
+
+        # Initialize training variables with defaults
+        self.initialize_training_variables()
+
+        # Initialize UI
+        self.create_ui()
+
+        # Load last settings
+        self.load_saved_settings()
+
+        # Start clock
+        self.update_clock()
+
+        logging.info("BJJ Timer Pro initialized successfully")
+
+    def initialize_training_variables(self):
+        """Initialize training-related variables."""
+        # Music variables
         self.playlist = []
         self.current_track_index = 0
         self.music_paused = False
-        
+
+        # Training state variables
         self.state = "IDLE"
         self.current_round = 1
         self.time_left = 0
@@ -37,12 +61,13 @@ class BJJTimerTouch:
         self.warning_sounded = False
         self.session_start_time = None
         self.rounds_completed = 0
-        
-        # Default training times
-        self.work_time = 5 * 60
-        self.rest_time = 1 * 60
+
+        # Default training settings (will be overridden by saved settings)
+        self.work_time = 5 * 60  # 5 minutes
+        self.rest_time = 1 * 60  # 1 minute
         self.total_rounds = 5
         self.prep_time = 12
+        self.root.configure(bg='#1a1a1a')
 
         # BJJ presets
         self.presets = {
@@ -54,25 +79,6 @@ class BJJTimerTouch:
             "Training": {"work": 5*60, "rest": 1*60, "rounds": 5},
         }
 
-        # Setup UI
-        self.root.configure(bg='#1a1a1a')
-        self.root.bind('<F11>', self.toggle_fullscreen)
-        self.root.bind('<Escape>', self.exit_fullscreen)
-
-        # Initialize keyboard shortcuts
-        self.shortcuts = KeyboardShortcuts(self.root, self)
-
-        # Create UI
-        self.create_ui()
-
-        # Load saved settings
-        self.load_saved_settings()
-
-        # Start clock
-        self.update_clock()
-
-        logging.info("BJJ Timer Pro initialized successfully")
-
     def load_saved_settings(self):
         """Load last saved training settings."""
         last_preset = self.config.get("last_preset", "Training")
@@ -82,6 +88,7 @@ class BJJTimerTouch:
             self.rest_time = self.config.get("rest_time", preset["rest"])
             self.total_rounds = self.config.get("total_rounds", preset["rounds"])
         else:
+            # Fallback to Training preset
             preset = self.presets["Training"]
             self.work_time = preset["work"]
             self.rest_time = preset["rest"]
@@ -89,7 +96,7 @@ class BJJTimerTouch:
 
         self.prep_time = self.config.get("prep_time", 12)
 
-        # Update UI labels if they exist
+        # Update UI labels
         if hasattr(self, 'work_label'):
             self.work_label.config(text=f"{self.work_time//60}")
         if hasattr(self, 'rest_label'):
@@ -108,12 +115,177 @@ class BJJTimerTouch:
             self.volume_slider.set(saved_volume)
             self.change_volume(str(saved_volume))
 
-    def save_current_settings(self):
-        """Save current training settings to config."""
-        self.config.set("work_time", self.work_time)
-        self.config.set("rest_time", self.rest_time)
-        self.config.set("total_rounds", self.total_rounds)
-        self.config.set("prep_time", self.prep_time)
+        self.warning_sounded = False
+        
+        # --- INTERFATA GRAFICA ---
+        self.create_ui()
+        
+        # Pornim ceasul
+        self.update_clock()
+
+    def create_ui(self):
+        # ===== FRAME SUPERIOR (Aerisit) =====
+        top_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=10)
+        top_frame.pack(fill=tk.X, side=tk.TOP, pady=5)
+        
+        # Left side - Preset selection
+        preset_section = tk.Frame(top_frame, bg='#2a2a2a')
+        preset_section.pack(side=tk.LEFT)
+        tk.Label(preset_section, text="SELECTEAZA PRESET:", font=("Arial", 14, "bold"), fg="#FFD700", bg='#2a2a2a').pack(anchor=tk.W)
+        
+        # Center - Title
+        title_section = tk.Frame(top_frame, bg='#2a2a2a')
+        title_section.pack(side=tk.LEFT, expand=True)
+        tk.Label(title_section, text="NOVA SQUAD", font=("Arial", 20, "bold"), fg="#FF6B00", bg='#2a2a2a').pack()
+        
+        # Right side - Utility buttons
+        utils_section = tk.Frame(top_frame, bg='#2a2a2a')
+        utils_section.pack(side=tk.RIGHT)
+        
+        stats_btn = tk.Button(utils_section, text="📊 Stats", font=("Arial", 10, "bold"),
+                             bg='#2196F3', fg='white', padx=10, pady=5,
+                             command=self.show_statistics, cursor="hand2")
+        stats_btn.pack(side=tk.LEFT, padx=5)
+        
+        shortcuts_btn = tk.Button(utils_section, text="⌨️ Help", font=("Arial", 10, "bold"),
+                                 bg='#FF9800', fg='white', padx=10, pady=5,
+                                 command=self.show_keyboard_shortcuts, cursor="hand2")
+        shortcuts_btn.pack(side=tk.LEFT, padx=5)
+        
+        preset_buttons_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=5)
+        preset_buttons_frame.pack(fill=tk.X, side=tk.TOP)
+        for preset_name in self.presets.keys():
+            btn = tk.Button(preset_buttons_frame, text=preset_name, font=("Arial", 11, "bold"),
+                           bg='#4CAF50', fg='white', padx=15, pady=5, 
+                           command=lambda p=preset_name: self.load_preset(p),
+                           relief=tk.RAISED, bd=2, cursor="hand2",
+                           activebackground='#45a049', activeforeground='white')
+            btn.pack(side=tk.LEFT, padx=5)
+        
+        # ===== FRAME CENTRALE - SETARI CUSTOM =====
+        settings_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=10)
+        settings_frame.pack(fill=tk.X, side=tk.TOP, pady=(5, 5))
+        tk.Label(settings_frame, text="SETARI PERSONALIZATE:", font=("Arial", 12, "bold"), fg="#FFD700", bg='#2a2a2a').pack(anchor=tk.W)
+        
+        times_frame = tk.Frame(settings_frame, bg='#2a2a2a')
+        times_frame.pack(fill=tk.X, pady=5)
+        
+        # LUPTA
+        work_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
+        work_box.pack(side=tk.LEFT, padx=10)
+        tk.Label(work_box, text="TIMP LUPTA (min)", font=("Arial", 11, "bold"), fg="#00FF00", bg='#333333').pack()
+        work_inner = tk.Frame(work_box, bg='#333333')
+        work_inner.pack()
+        tk.Button(work_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_work, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        self.work_label = tk.Label(work_inner, text=f"{self.work_time//60}", font=("Arial", 20, "bold"), fg="#00FF00", bg='#333333', width=5)
+        self.work_label.pack(side=tk.LEFT, padx=10)
+        tk.Button(work_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_work, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        
+        # PAUZA
+        rest_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
+        rest_box.pack(side=tk.LEFT, padx=10)
+        tk.Label(rest_box, text="TIMP PAUZA (min)", font=("Arial", 11, "bold"), fg="#FF4444", bg='#333333').pack()
+        rest_inner = tk.Frame(rest_box, bg='#333333')
+        rest_inner.pack()
+        tk.Button(rest_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_rest, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        self.rest_label = tk.Label(rest_inner, text=f"{self.rest_time//60}", font=("Arial", 20, "bold"), fg="#FF4444", bg='#333333', width=5)
+        self.rest_label.pack(side=tk.LEFT, padx=10)
+        tk.Button(rest_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_rest, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        
+        # RUNDE
+        rounds_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
+        rounds_box.pack(side=tk.LEFT, padx=10)
+        tk.Label(rounds_box, text="NR. RUNDE", font=("Arial", 11, "bold"), fg="#00FFFF", bg='#333333').pack()
+        rounds_inner = tk.Frame(rounds_box, bg='#333333')
+        rounds_inner.pack()
+        tk.Button(rounds_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_rounds, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        self.rounds_label = tk.Label(rounds_inner, text=f"{self.total_rounds}", font=("Arial", 20, "bold"), fg="#00FFFF", bg='#333333', width=5)
+        self.rounds_label.pack(side=tk.LEFT, padx=10)
+        tk.Button(rounds_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_rounds, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        
+        # =========================================================================================
+        # FRAME-UL DE JOS (PLAYER COMPACT + BUTOANE MARI) 
+        # =========================================================================================
+        bottom_frame = tk.Frame(self.root, bg='#1a1a1a')
+        bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=20, pady=20)
+
+        # -- Partea Stanga: Controale Timer (Butoanele uriase) --
+        control_frame = tk.Frame(bottom_frame, bg='#2a2a2a', padx=20, pady=15, relief=tk.RAISED, bd=2)
+        control_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        control_buttons = tk.Frame(control_frame, bg='#2a2a2a')
+        control_buttons.pack(fill=tk.X, pady=10)
+        
+        # BUTOANE MARITE AICI:
+        self.start_button = tk.Button(control_buttons, text="▶ START", font=("Arial", 20, "bold"),
+                                     bg='#4CAF50', fg='white', padx=45, pady=20,
+                                     command=self.toggle_timer, relief=tk.RAISED, bd=4,
+                                     cursor="hand2", activebackground='#45a049', activeforeground='white')
+        self.start_button.pack(side=tk.LEFT, padx=10)
+        
+        self.pause_button = tk.Button(control_buttons, text="⏸ PAUZA", font=("Arial", 20, "bold"),
+                                     bg='#FFA500', fg='white', padx=45, pady=20,
+                                     command=self.toggle_pause, relief=tk.RAISED, bd=4,
+                                     cursor="hand2", activebackground='#FF8C00', activeforeground='white',
+                                     state=tk.DISABLED)
+        self.pause_button.pack(side=tk.LEFT, padx=10)
+        
+        self.reset_button = tk.Button(control_buttons, text="↻ RESET", font=("Arial", 20, "bold"),
+                                     bg='#FF6B6B', fg='white', padx=45, pady=20,
+                                     command=self.reset_timer, relief=tk.RAISED, bd=4,
+                                     cursor="hand2", activebackground='#FF5252', activeforeground='white')
+        self.reset_button.pack(side=tk.LEFT, padx=10)
+        
+        self.status_label = tk.Label(control_frame, text="Status: Ready - Selectează preset și apasă START", 
+                                    font=("Arial", 12, "bold"), fg="#FFD700", bg='#2a2a2a')
+        self.status_label.pack(side=tk.LEFT, pady=10)
+
+        # -- Partea Dreapta: Music Player (Compact, FARA sa fie lățit la infinit) --
+        music_frame = tk.Frame(bottom_frame, bg='#1e3d59', padx=15, pady=10, relief=tk.RIDGE, bd=4)
+        # Am scos expand=True de aici, ca sa fie fix cat are nevoie
+        music_frame.pack(side=tk.RIGHT, fill=tk.Y)
+
+        row1 = tk.Frame(music_frame, bg='#1e3d59')
+        row1.pack(fill=tk.X, pady=(0, 5))
+        
+        tk.Label(row1, text="🎧 NOVA SQUAD", font=("Arial", 12, "bold"), fg="#00FFFF", bg='#1e3d59').pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.display_frame = tk.Frame(row1, bg='black', relief=tk.SUNKEN, bd=3, padx=5, pady=2)
+        self.display_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # Latimea textului e setata la 25 de caractere (compact dar destul)
+        self.track_label = tk.Label(self.display_frame, text="Așteptare...", font=("Consolas", 12, "bold"), fg="#00FF00", bg='black', width=25, anchor="w")
+        self.track_label.pack(fill=tk.X)
+
+        row2 = tk.Frame(music_frame, bg='#1e3d59')
+        row2.pack(fill=tk.X, pady=5)
+
+        tk.Button(row2, text="📁 FOLDER", font=("Arial", 12, "bold"), bg='#ff9900', fg='white', padx=10, pady=5, command=self.load_music_folder, cursor="hand2").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Button(row2, text="⏮", font=("Arial", 14), bg='#333333', fg='white', width=3, command=self.prev_track, cursor="hand2").pack(side=tk.LEFT, padx=2)
+        self.play_music_btn = tk.Button(row2, text="⏯", font=("Arial", 14), bg='#333333', fg='white', width=4, command=self.toggle_music, cursor="hand2")
+        self.play_music_btn.pack(side=tk.LEFT, padx=2)
+        tk.Button(row2, text="⏭", font=("Arial", 14), bg='#333333', fg='white', width=3, command=self.next_track, cursor="hand2").pack(side=tk.LEFT, padx=2)
+
+        vol_frame = tk.Frame(row2, bg='#1e3d59')
+        vol_frame.pack(side=tk.RIGHT, fill=tk.X, padx=(10, 0))
+        tk.Label(vol_frame, text="🔈", font=("Arial", 14), bg='#1e3d59', fg='white').pack(side=tk.LEFT)
+        self.volume_slider = tk.Scale(vol_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg='#1e3d59', fg='white', highlightthickness=0, command=self.change_volume)
+        self.volume_slider.set(50) 
+        self.volume_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        tk.Label(vol_frame, text="🔊", font=("Arial", 14), bg='#1e3d59', fg='white').pack(side=tk.LEFT)
+
+        # =========================================================================================
+        # FRAME-UL CENTRAL (TIMER)
+        # =========================================================================================
+        main_frame = tk.Frame(self.root, bg='#1a1a1a')
+        main_frame.pack(expand=True, fill=tk.BOTH, side=tk.TOP, padx=10, pady=10)
+        
+        # Font setat la 250 (foarte mare, dar sigur pe absolut orice ecran touch)
+        self.time_label = tk.Label(main_frame, text="00:00", font=("Digital-7", 320, "bold"), fg="#00FF00", bg='#1a1a1a')
+        self.time_label.pack(expand=True)
+        
+        # Textul informativ sub timer, foarte vizibil
+        self.info_label = tk.Label(main_frame, text="APASA START PENTRU A INCEPE", font=("Arial", 35, "bold"), fg="white", bg='#1a1a1a')
+        self.info_label.pack(pady=10)
 
     def load_music_from_path(self, folder_path):
         """Load music from a specific folder path."""
@@ -137,157 +309,15 @@ class BJJTimerTouch:
             logging.error(f"Error loading music folder: {e}")
             self.track_label.config(text="Eroare la încărcarea folderului!")
 
-    def create_ui(self):
-        # ===== TOP FRAME WITH TITLE AND UTILITY BUTTONS =====
-        top_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=10)
-        top_frame.pack(fill=tk.X, side=tk.TOP, pady=5)
-        
-        preset_label = tk.Label(top_frame, text="SELECTEAZA PRESET:", font=("Arial", 14, "bold"), fg="#FFD700", bg='#2a2a2a')
-        preset_label.pack(side=tk.LEFT, anchor=tk.W)
-        
-        title_label = tk.Label(top_frame, text="NOVA SQUAD", font=("Arial", 20, "bold"), fg="#FF6B00", bg='#2a2a2a')
-        title_label.pack(side=tk.LEFT, expand=True, padx=20)
-        
-        # Utility buttons
-        stats_btn = tk.Button(top_frame, text="📊 Stats", font=("Arial", 10, "bold"),
-                             bg='#2196F3', fg='white', padx=10, pady=5,
-                             command=self.show_statistics, cursor="hand2")
-        stats_btn.pack(side=tk.RIGHT, padx=5)
-        
-        shortcuts_btn = tk.Button(top_frame, text="⌨️ Help", font=("Arial", 10, "bold"),
-                                 bg='#FF9800', fg='white', padx=10, pady=5,
-                                 command=self.show_keyboard_shortcuts, cursor="hand2")
-        shortcuts_btn.pack(side=tk.RIGHT, padx=5)
-
-        # ===== PRESET BUTTONS FRAME =====
-        preset_buttons_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=5)
-        preset_buttons_frame.pack(fill=tk.X, side=tk.TOP)
-        for preset_name in self.presets.keys():
-            btn = tk.Button(preset_buttons_frame, text=preset_name, font=("Arial", 11, "bold"),
-                           bg='#4CAF50', fg='white', padx=15, pady=5, 
-                           command=lambda p=preset_name: self.load_preset(p),
-                           relief=tk.RAISED, bd=2, cursor="hand2",
-                           activebackground='#45a049', activeforeground='white')
-            btn.pack(side=tk.LEFT, padx=5)
-
-        # ===== SETTINGS FRAME =====
-        settings_frame = tk.Frame(self.root, bg='#2a2a2a', padx=15, pady=10)
-        settings_frame.pack(fill=tk.X, side=tk.TOP, pady=(5, 5))
-        tk.Label(settings_frame, text="SETARI PERSONALIZATE:", font=("Arial", 12, "bold"), fg="#FFD700", bg='#2a2a2a').pack(anchor=tk.W)
-
-        times_frame = tk.Frame(settings_frame, bg='#2a2a2a')
-        times_frame.pack(fill=tk.X, pady=5)
-
-        # Work time
-        work_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
-        work_box.pack(side=tk.LEFT, padx=10)
-        tk.Label(work_box, text="TIMP LUPTA (min)", font=("Arial", 11, "bold"), fg="#00FF00", bg='#333333').pack()
-        work_inner = tk.Frame(work_box, bg='#333333')
-        work_inner.pack()
-        tk.Button(work_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_work, cursor="hand2").pack(side=tk.LEFT, padx=5)
-        self.work_label = tk.Label(work_inner, text=f"{self.work_time//60}", font=("Arial", 20, "bold"), fg="#00FF00", bg='#333333', width=5)
-        self.work_label.pack(side=tk.LEFT, padx=10)
-        tk.Button(work_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_work, cursor="hand2").pack(side=tk.LEFT, padx=5)
-
-        # Rest time
-        rest_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
-        rest_box.pack(side=tk.LEFT, padx=10)
-        tk.Label(rest_box, text="TIMP PAUZA (min)", font=("Arial", 11, "bold"), fg="#FF4444", bg='#333333').pack()
-        rest_inner = tk.Frame(rest_box, bg='#333333')
-        rest_inner.pack()
-        tk.Button(rest_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_rest, cursor="hand2").pack(side=tk.LEFT, padx=5)
-        self.rest_label = tk.Label(rest_inner, text=f"{self.rest_time//60}", font=("Arial", 20, "bold"), fg="#FF4444", bg='#333333', width=5)
-        self.rest_label.pack(side=tk.LEFT, padx=10)
-        tk.Button(rest_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_rest, cursor="hand2").pack(side=tk.LEFT, padx=5)
-
-        # Rounds
-        rounds_box = tk.Frame(times_frame, bg='#333333', padx=15, pady=5, relief=tk.RAISED, bd=2)
-        rounds_box.pack(side=tk.LEFT, padx=10)
-        tk.Label(rounds_box, text="NR. RUNDE", font=("Arial", 11, "bold"), fg="#00FFFF", bg='#333333').pack()
-        rounds_inner = tk.Frame(rounds_box, bg='#333333')
-        rounds_inner.pack()
-        tk.Button(rounds_inner, text="−", font=("Arial", 16, "bold"), bg='#FF6B6B', fg='white', width=3, command=self.decrease_rounds, cursor="hand2").pack(side=tk.LEFT, padx=5)
-        self.rounds_label = tk.Label(rounds_inner, text=f"{self.total_rounds}", font=("Arial", 20, "bold"), fg="#00FFFF", bg='#333333', width=5)
-        self.rounds_label.pack(side=tk.LEFT, padx=10)
-        tk.Button(rounds_inner, text="+", font=("Arial", 16, "bold"), bg='#4CAF50', fg='white', width=3, command=self.increase_rounds, cursor="hand2").pack(side=tk.LEFT, padx=5)
-
-        # ===== BOTTOM FRAME (CONTROLS + MUSIC) =====
-        bottom_frame = tk.Frame(self.root, bg='#1a1a1a')
-        bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=20, pady=20)
-
-        # Left: Timer controls
-        control_frame = tk.Frame(bottom_frame, bg='#2a2a2a', padx=20, pady=15, relief=tk.RAISED, bd=2)
-        control_frame.pack(side=tk.LEFT, fill=tk.Y)
-
-        control_buttons = tk.Frame(control_frame, bg='#2a2a2a')
-        control_buttons.pack(fill=tk.X, pady=10)
-
-        self.start_button = tk.Button(control_buttons, text="▶ START", font=("Arial", 20, "bold"),
-                                     bg='#4CAF50', fg='white', padx=45, pady=20,
-                                     command=self.toggle_timer, relief=tk.RAISED, bd=4,
-                                     cursor="hand2", activebackground='#45a049')
-        self.start_button.pack(side=tk.LEFT, padx=10)
-
-        self.pause_button = tk.Button(control_buttons, text="⏸ PAUZA", font=("Arial", 20, "bold"),
-                                     bg='#FFA500', fg='white', padx=45, pady=20,
-                                     command=self.toggle_pause, relief=tk.RAISED, bd=4,
-                                     cursor="hand2", activebackground='#FF8C00',
-                                     state=tk.DISABLED)
-        self.pause_button.pack(side=tk.LEFT, padx=10)
-
-        self.reset_button = tk.Button(control_buttons, text="↻ RESET", font=("Arial", 20, "bold"),
-                                     bg='#FF6B6B', fg='white', padx=45, pady=20,
-                                     command=self.reset_timer, relief=tk.RAISED, bd=4,
-                                     cursor="hand2", activebackground='#FF5252')
-        self.reset_button.pack(side=tk.LEFT, padx=10)
-
-        self.status_label = tk.Label(control_frame, text="Status: Ready - Selectează preset și apasă START", 
-                                    font=("Arial", 12, "bold"), fg="#FFD700", bg='#2a2a2a')
-        self.status_label.pack(side=tk.LEFT, pady=10)
-
-        # Right: Music player
-        music_frame = tk.Frame(bottom_frame, bg='#1e3d59', padx=15, pady=10, relief=tk.RIDGE, bd=4)
-        music_frame.pack(side=tk.RIGHT, fill=tk.Y)
-
-        row1 = tk.Frame(music_frame, bg='#1e3d59')
-        row1.pack(fill=tk.X, pady=(0, 5))
-
-        tk.Label(row1, text="🎧 NOVA SQUAD", font=("Arial", 12, "bold"), fg="#00FFFF", bg='#1e3d59').pack(side=tk.LEFT, padx=(0, 10))
-
-        self.display_frame = tk.Frame(row1, bg='black', relief=tk.SUNKEN, bd=3, padx=5, pady=2)
-        self.display_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.track_label = tk.Label(self.display_frame, text="Așteptare...", font=("Consolas", 12, "bold"), fg="#00FF00", bg='black', width=25, anchor="w")
-        self.track_label.pack(fill=tk.X)
-
-        row2 = tk.Frame(music_frame, bg='#1e3d59')
-        row2.pack(fill=tk.X, pady=5)
-
-        tk.Button(row2, text="📁 FOLDER", font=("Arial", 12, "bold"), bg='#ff9900', fg='white', padx=10, pady=5, command=self.load_music_folder, cursor="hand2").pack(side=tk.LEFT, padx=(0, 5))
-        tk.Button(row2, text="⏮", font=("Arial", 14), bg='#333333', fg='white', width=3, command=self.prev_track, cursor="hand2").pack(side=tk.LEFT, padx=2)
-        self.play_music_btn = tk.Button(row2, text="⏯", font=("Arial", 14), bg='#333333', fg='white', width=4, command=self.toggle_music, cursor="hand2")
-        self.play_music_btn.pack(side=tk.LEFT, padx=2)
-        tk.Button(row2, text="⏭", font=("Arial", 14), bg='#333333', fg='white', width=3, command=self.next_track, cursor="hand2").pack(side=tk.LEFT, padx=2)
-
-        vol_frame = tk.Frame(row2, bg='#1e3d59')
-        vol_frame.pack(side=tk.RIGHT, fill=tk.X, padx=(10, 0))
-        tk.Label(vol_frame, text="🔈", font=("Arial", 14), bg='#1e3d59', fg='white').pack(side=tk.LEFT)
-        self.volume_slider = tk.Scale(vol_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg='#1e3d59', fg='white', highlightthickness=0, command=self.change_volume)
-        self.volume_slider.set(50)
-        self.volume_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        tk.Label(vol_frame, text="🔊", font=("Arial", 14), bg='#1e3d59', fg='white').pack(side=tk.LEFT)
-
-        # ===== MAIN TIMER DISPLAY =====
-        main_frame = tk.Frame(self.root, bg='#1a1a1a')
-        main_frame.pack(expand=True, fill=tk.BOTH, side=tk.TOP, padx=10, pady=10)
-
-        self.time_label = tk.Label(main_frame, text="00:00", font=("Digital-7", 320, "bold"), fg="#00FF00", bg='#1a1a1a')
-        self.time_label.pack(expand=True)
-
-        self.info_label = tk.Label(main_frame, text="APASA START PENTRU A INCEPE", font=("Arial", 35, "bold"), fg="white", bg='#1a1a1a')
-        self.info_label.pack(pady=10)
+    def save_current_settings(self):
+        """Save current training settings to config."""
+        self.config.set("work_time", self.work_time)
+        self.config.set("rest_time", self.rest_time)
+        self.config.set("total_rounds", self.total_rounds)
+        self.config.set("prep_time", self.prep_time)
 
     # ==========================================
-    # MUSIC PLAYER FUNCTIONS
+    # LOGICA MUSIC PLAYER
     # ==========================================
     def load_music_folder(self):
         folder_selected = filedialog.askdirectory(title="Selectează folderul cu muzică de pe USB")
@@ -297,32 +327,31 @@ class BJJTimerTouch:
     def play_track(self):
         if not self.playlist or not self.sound_manager.pygame_available:
             return
-
+            
         track_path = self.playlist[self.current_track_index]
         track_name = os.path.basename(track_path)
-
+        
         if len(track_name) > 30:
             track_name = track_name[:27] + "..."
-
+            
         self.track_label.config(text=f"🎵 {track_name}")
-
+        
         try:
             pygame.mixer.music.load(track_path)
             pygame.mixer.music.play()
-
+            
             vol = float(self.volume_slider.get()) / 100.0
             pygame.mixer.music.set_volume(vol)
-
+            
             self.music_paused = False
             self.play_music_btn.config(bg="#4CAF50")
         except Exception as e:
-            logging.error(f"Error playing track: {e}")
             self.track_label.config(text="Eroare redare!")
 
     def toggle_music(self):
         if not self.playlist or not self.sound_manager.pygame_available:
             return
-
+            
         if pygame.mixer.music.get_busy() or self.music_paused:
             if self.music_paused:
                 pygame.mixer.music.unpause()
@@ -354,8 +383,9 @@ class BJJTimerTouch:
             except Exception:
                 pass
 
+
     # ==========================================
-    # TIMER FUNCTIONS
+    # LOGICA TIMER-ULUI
     # ==========================================
     def load_preset(self, preset_name):
         if self.state == "IDLE":
@@ -425,10 +455,10 @@ class BJJTimerTouch:
             self.start_button.config(state=tk.DISABLED)
             self.pause_button.config(state=tk.NORMAL)
             self.status_label.config(text="Status: Pregatire - Treci pe saltea LAPTE PRAF!")
-
+            
             self.sound_manager.play('prepare', 800, 100)
             self.update_ui_colors()
-
+            
         elif self.state == "FINISHED":
             self.reset_timer()
 
@@ -438,13 +468,13 @@ class BJJTimerTouch:
             if self.is_paused:
                 self.pause_button.config(text="▶ CONTINUA", bg='#4CAF50')
                 self.status_label.config(text="Status: PAUZA - Apasă CONTINUA pentru a relua")
-                self.sound_manager.play('button', 600, 100)
+                self.sound_manager.play('none', 600, 100)
             else:
                 self.pause_button.config(text="⏸ PAUZA", bg='#FFA500')
                 self.warning_sounded = False
                 self.status_label.config(text="Status: RULARE - Apasă PAUZA pentru a face pauza")
                 self.update_ui_colors()
-                self.sound_manager.play('button', 800, 100)
+                self.sound_manager.play('none', 800, 100)
 
     def update_ui_colors(self):
         if self.state == "PREPARE":
@@ -477,12 +507,12 @@ class BJJTimerTouch:
     def update_clock(self):
         if not self.is_paused and self.state not in ["IDLE", "FINISHED"]:
             self.time_left -= 1
-
+            
             if self.time_left == 10 and not self.warning_sounded and self.state == "WORK":
                 self.warning_sounded = True
                 self.sound_manager.play('warning', 1000, 150)
                 self.info_label.config(text=f"RUNDA {self.current_round}/{self.total_rounds} - ULTIMILE 10!", fg="#FFB700")
-
+            
             if self.time_left <= 0:
                 self.next_state()
 
@@ -502,7 +532,7 @@ class BJJTimerTouch:
             self.time_left = self.work_time
             self.warning_sounded = False
             self.sound_manager.play('work', 1200, 200)
-
+            
         elif self.state == "WORK":
             self.rounds_completed += 1
             if self.current_round < self.total_rounds:
@@ -518,8 +548,8 @@ class BJJTimerTouch:
                 self.status_label.config(text="Status: Training complete - BRAVO!")
                 self.start_button.config(state=tk.NORMAL)
                 self.pause_button.config(state=tk.DISABLED)
-
-                # Record training session
+                
+                # Record training session statistics
                 if self.session_start_time:
                     session_duration = int((datetime.now() - self.session_start_time).total_seconds())
                     last_preset = self.config.get("last_preset", "Custom")
@@ -532,35 +562,39 @@ class BJJTimerTouch:
                         total_time=session_duration
                     )
                     logging.info(f"Training session recorded: {session_duration}s, {self.rounds_completed}/{self.total_rounds} rounds")
-
+                
                 self.sound_manager.play('finished', 1500, 500)
                 return
-
+                
         elif self.state == "REST":
             self.current_round += 1
             self.state = "WORK"
             self.time_left = self.work_time
             self.warning_sounded = False
             self.sound_manager.play('work', 1200, 200)
-
+        
         self.update_ui_colors()
 
     def show_statistics(self):
-        """Display training statistics."""
+        """Display training statistics in a dialog window."""
         stats_window = tk.Toplevel(self.root)
         stats_window.title("Training Statistics - BJJ Timer Pro")
         stats_window.geometry("600x500")
         stats_window.configure(bg='#1a1a1a')
+        stats_window.resizable(True, True)
 
+        # Title
         title_label = tk.Label(stats_window, text="📊 STATISTICI ANTRENAMENT",
                               font=("Arial", 18, "bold"), fg="#FFD700", bg='#1a1a1a')
         title_label.pack(pady=10)
 
+        # Stats frame
         stats_frame = tk.Frame(stats_window, bg='#2a2a2a', padx=20, pady=20)
         stats_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         summary = self.stats.get_summary()
 
+        # Summary stats
         summary_text = f"""
 Total sesiuni: {summary['total_sessions']}
 Timp total antrenament: {self.stats.format_time(summary['total_training_time'])}
@@ -577,12 +611,13 @@ Ultimele 30 de zile:
                               fg="white", bg='#2a2a2a', justify=tk.LEFT, anchor="w")
         stats_label.pack(anchor=tk.W, pady=10)
 
+        # Buttons frame
         buttons_frame = tk.Frame(stats_window, bg='#1a1a1a', pady=10)
         buttons_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        export_btn = tk.Button(buttons_frame, text="📄 Exportă",
+        export_btn = tk.Button(buttons_frame, text="📄 Exportă statistici",
                               font=("Arial", 12, "bold"), bg='#4CAF50', fg='white',
-                              command=self.export_statistics)
+                              command=lambda: self.export_statistics(stats_window))
         export_btn.pack(side=tk.LEFT, padx=10)
 
         close_btn = tk.Button(buttons_frame, text="❌ Închide",
@@ -590,8 +625,8 @@ Ultimele 30 de zile:
                              command=stats_window.destroy)
         close_btn.pack(side=tk.RIGHT, padx=10)
 
-    def export_statistics(self):
-        """Export statistics to file."""
+    def export_statistics(self, parent_window):
+        """Export statistics to a file."""
         try:
             filename = self.stats.export_stats()
             messagebox.showinfo("Export reușit",
@@ -603,7 +638,7 @@ Ultimele 30 de zile:
     def show_keyboard_shortcuts(self):
         """Display keyboard shortcuts help."""
         shortcuts_window = tk.Toplevel(self.root)
-        shortcuts_window.title("Keyboard Shortcuts")
+        shortcuts_window.title("Keyboard Shortcuts - BJJ Timer Pro")
         shortcuts_window.geometry("500x600")
         shortcuts_window.configure(bg='#1a1a1a')
 
@@ -611,6 +646,7 @@ Ultimele 30 de zile:
                               font=("Arial", 16, "bold"), fg="#FFD700", bg='#1a1a1a')
         title_label.pack(pady=10)
 
+        # Shortcuts text
         shortcuts_text = tk.Label(shortcuts_window,
                                  text=KeyboardShortcuts.get_shortcuts_help(),
                                  font=("Consolas", 10), fg="white", bg='#1a1a1a',
@@ -628,7 +664,6 @@ Ultimele 30 de zile:
 
     def exit_fullscreen(self, event=None):
         self.root.attributes('-fullscreen', False)
-
 
 if __name__ == "__main__":
     root = tk.Tk()
